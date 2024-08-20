@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 import trajectory_planning_helpers as tph
 
@@ -5,10 +7,6 @@ import trajectory_planning_helpers as tph
 def iqp_handler(reftrack: np.ndarray,
                 normvectors: np.ndarray,
                 A: np.ndarray,
-                spline_len: np.ndarray,
-                psi: np.ndarray,
-                kappa: np.ndarray,
-                dkappa: np.ndarray,
                 kappa_bound: float,
                 w_veh: float,
                 print_debug: bool,
@@ -16,7 +14,6 @@ def iqp_handler(reftrack: np.ndarray,
                 stepsize_interp: float,
                 iters_min: int = 3,
                 curv_error_allowed: float = 0.01) -> tuple:
-
     """
     author:
     Alexander Heilmeier
@@ -50,18 +47,6 @@ def iqp_handler(reftrack: np.ndarray,
                                 -> System matrices have the form a_i, b_i * t, c_i * t^2, d_i * t^3
                                 -> see calc_splines.py for further information or to obtain this matrix
     :type A:                    np.ndarray
-    :param spline_len:          spline lengths for every point of the reference track [x, y]
-                                (unit is meter, must be unclosed!)
-    :type spline_len:           np.ndarray
-    :param psi:                 heading for every point of the reference track [x, y]
-                                (unit is rad, must be unclosed!)
-    :type psi:                  np.ndarray
-    :param kappa:               curvature for every point of the reference track [x, y]
-                                (unit is 1/m, must be unclosed!)
-    :type kappa:                np.ndarray
-    :param dkappa:              derivative of curvature for every point of the reference track [x, y]
-                                (unit is 1/m^2, must be unclosed!)
-    :type dkappa:               np.ndarray
     :param kappa_bound:         curvature boundary to consider during optimization.
     :type kappa_bound:          float
     :param w_veh:               vehicle width in m. It is considered during the calculation of the allowed deviations
@@ -112,10 +97,6 @@ def iqp_handler(reftrack: np.ndarray,
     reftrack_tmp = reftrack
     normvectors_tmp = normvectors
     A_tmp = A
-    spline_len_tmp = spline_len
-    psi_reftrack_tmp = psi
-    kappa_reftrack_tmp = kappa
-    dkappa_reftrack_tmp = dkappa
 
     # loop
     iter_cur = 0
@@ -192,8 +173,8 @@ def iqp_handler(reftrack: np.ndarray,
             calc_dcurv=True
         )
 
-    return alpha_mincurv_tmp, reftrack_tmp, normvectors_tmp, spline_len_tmp, psi_reftrack_tmp, kappa_reftrack_tmp,\
-           dkappa_reftrack_tmp
+    return alpha_mincurv_tmp, reftrack_tmp, normvectors_tmp, spline_len_tmp, psi_reftrack_tmp, kappa_reftrack_tmp, \
+        dkappa_reftrack_tmp
 
 
 # testing --------------------------------------------------------------------------------------------------------------
