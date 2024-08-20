@@ -1,9 +1,8 @@
-from scipy import interpolate
-from scipy import optimize
-from scipy import spatial
-import numpy as np
 import math
+
+import numpy as np
 import trajectory_planning_helpers as tph
+from scipy import interpolate, optimize, spatial
 
 
 def spline_approximation(track: np.ndarray,
@@ -113,7 +112,7 @@ def spline_approximation(track: np.ndarray,
 
     for i in range(no_points_track_cl - 1):
         sides[i] = tph.side_of_line.side_of_line(a=track_cl[i, :2],
-                                                 b=track_cl[i+1, :2],
+                                                 b=track_cl[i + 1, :2],
                                                  z=closest_point_cl[i])
 
     sides_cl = np.hstack((sides, sides[0]))
@@ -143,6 +142,8 @@ def spline_approximation(track: np.ndarray,
 # return distance from point p to a point on the spline at spline parameter t_glob
 def dist_to_p(t_glob: np.ndarray, path: list, p: np.ndarray):
     s = interpolate.splev(t_glob, path)
+    s = np.array(s).flatten()  # make 1d
+
     return spatial.distance.euclidean(p, s)
 
 
