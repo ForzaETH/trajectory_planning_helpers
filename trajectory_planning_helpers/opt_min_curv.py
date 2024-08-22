@@ -9,7 +9,7 @@ def opt_min_curv(reftrack: np.ndarray,
                  normvectors: np.ndarray,
                  A: np.ndarray,
                  kappa_bound: float,
-                 w_veh: float,
+                 w_veh: np.ndarray,
                  print_debug: bool = False,
                  plot_debug: bool = False,
                  closed: bool = True,
@@ -201,7 +201,7 @@ def opt_min_curv(reftrack: np.ndarray,
 
     f_x = 2 * np.matmul(np.matmul(q_x.T, T_c.T), np.matmul(P_xx, T_nx))
     f_xy = np.matmul(np.matmul(q_x.T, T_c.T), np.matmul(P_xy, T_ny)) \
-           + np.matmul(np.matmul(q_y.T, T_c.T), np.matmul(P_xy, T_nx))
+        + np.matmul(np.matmul(q_y.T, T_c.T), np.matmul(P_xy, T_nx))
     f_y = 2 * np.matmul(np.matmul(q_y.T, T_c.T), np.matmul(P_yy, T_ny))
     f = f_x + f_xy + f_y
     f = np.squeeze(f)   # remove non-singleton dimensions
@@ -228,7 +228,7 @@ def opt_min_curv(reftrack: np.ndarray,
     # ------------------------------------------------------------------------------------------------------------------
 
     """
-    quadprog interface description taken from 
+    quadprog interface description taken from
     https://github.com/stephane-caron/qpsolvers/blob/master/qpsolvers/quadprog_.py
 
     Solve a Quadratic Program defined as:
@@ -271,8 +271,8 @@ def opt_min_curv(reftrack: np.ndarray,
     """
 
     # calculate allowed deviation from refline
-    dev_max_right = reftrack[:, 2] - w_veh / 2
-    dev_max_left = reftrack[:, 3] - w_veh / 2
+    dev_max_right = reftrack[:, 2] - w_veh
+    dev_max_left = reftrack[:, 3] - w_veh
 
     # constrain resulting path to reference line at start- and end-point for open tracks
     if not closed and fix_s:
@@ -330,9 +330,9 @@ def opt_min_curv(reftrack: np.ndarray,
 
     for i in range(no_points):
         curv_orig_lin[i] = (x_prime[i, i] * y_prime_prime[i] - y_prime[i, i] * x_prime_prime[i]) \
-                          / math.pow(math.pow(x_prime[i, i], 2) + math.pow(y_prime[i, i], 2), 1.5)
+            / math.pow(math.pow(x_prime[i, i], 2) + math.pow(y_prime[i, i], 2), 1.5)
         curv_sol_lin[i] = (x_prime_tmp[i, i] * y_prime_prime[i] - y_prime_tmp[i, i] * x_prime_prime[i]) \
-                           / math.pow(math.pow(x_prime_tmp[i, i], 2) + math.pow(y_prime_tmp[i, i], 2), 1.5)
+            / math.pow(math.pow(x_prime_tmp[i, i], 2) + math.pow(y_prime_tmp[i, i], 2), 1.5)
 
     if plot_debug:
         plt.plot(curv_orig_lin)

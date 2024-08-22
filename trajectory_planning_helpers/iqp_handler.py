@@ -95,6 +95,8 @@ def iqp_handler(reftrack: np.ndarray,
 
     # set initial data
     reftrack_tmp = reftrack
+    # Start with small saftey distance --> large curvature to get aggressive racing line
+    kappa_reftrack_tmp = np.ones(reftrack_tmp.shape[0])
     normvectors_tmp = normvectors
     A_tmp = A
 
@@ -104,13 +106,20 @@ def iqp_handler(reftrack: np.ndarray,
     while True:
         iter_cur += 1
 
+        saftey_distances = kappa_to_width_transform(kappas=kappa_reftrack_tmp,
+                                                    racecar_width=w_veh,
+                                                    max_safety_dist=0.45,
+                                                    min_safety_dist=0.15,
+                                                    max_curvature=0.5,
+                                                    min_curvature=0.0)
+
         # calculate intermediate solution and catch sum of squared curvature errors
         alpha_mincurv_tmp, curv_error_max_tmp = tph.opt_min_curv.\
             opt_min_curv(reftrack=reftrack_tmp,
                          normvectors=normvectors_tmp,
                          A=A_tmp,
                          kappa_bound=kappa_bound,
-                         w_veh=w_veh,
+                         w_veh=saftey_distances,
                          print_debug=print_debug,
                          plot_debug=plot_debug)
 
@@ -175,6 +184,28 @@ def iqp_handler(reftrack: np.ndarray,
 
     return alpha_mincurv_tmp, reftrack_tmp, normvectors_tmp, spline_len_tmp, psi_reftrack_tmp, kappa_reftrack_tmp, \
         dkappa_reftrack_tmp
+
+
+def kappa_to_width_transform(kappas: np.ndarray,
+                             racecar_width: float,
+                             max_safety_dist: float = 0.3,
+                             min_safety_dist: float = 0.0,
+                             max_curvature: float = 0.5,
+                             min_curvature: float = 0.0
+                             ) -> np.ndarray:
+    # Ensure that all inputs are floats (and not smth like casadi-dm)
+    kappas = np.abs(kappas)   # curvature can be both +ve and -ve
+
+    m = (min_safety_dist - max_safety_dist) / (max_curvature - min_curvature)
+    c = max_safety_dist - m * min_curvature
+
+    linear_transform = m * kappas + c
+
+    # clamped between min and max safety dist
+    clamped_safety_dist = np.clip(linear_transform, min_safety_dist, max_safety_dist)
+    safety_dist_with_car = clamped_safety_dist + (racecar_width / 2)
+
+    return safety_dist_with_car
 
 
 # testing --------------------------------------------------------------------------------------------------------------
