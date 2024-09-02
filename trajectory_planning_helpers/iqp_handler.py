@@ -1,7 +1,9 @@
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 import trajectory_planning_helpers as tph
+from pbl_global_racetrajectory_optimization.helper_funcs_glob.src.curvature_dependent_safety_width import \
+    curvature_dependent_safety_width
 
 
 def iqp_handler(reftrack: np.ndarray,
@@ -13,7 +15,9 @@ def iqp_handler(reftrack: np.ndarray,
                 plot_debug: bool,
                 stepsize_interp: float,
                 iters_min: int = 3,
-                curv_error_allowed: float = 0.01) -> tuple:
+                curv_error_allowed: float = 0.01,
+                curv_calc_opts: Optional[Dict[str, float]] = None,
+                curv_safety_width_params: Optional[Dict[str, float]] = None) -> tuple:
     """
     author:
     Alexander Heilmeier
@@ -95,10 +99,39 @@ def iqp_handler(reftrack: np.ndarray,
 
     # set initial data
     reftrack_tmp = reftrack
-    # Start with small saftey distance --> large curvature to get aggressive racing line
-    kappa_reftrack_tmp = np.ones(reftrack_tmp.shape[0])
     normvectors_tmp = normvectors
     A_tmp = A
+
+    # Read safety width params
+    if curv_safety_width_params is not None and curv_calc_opts is not None:
+        min_safety_dist: float = curv_safety_width_params["min_safety_dist"]
+        max_safety_dist: float = curv_safety_width_params["max_safety_dist"]
+        max_curvature: float = curv_safety_width_params["max_curvature"]
+        min_curvature: float = curv_safety_width_params["min_curvature"]
+
+        # Compute curvature of the reference track
+        refpath_cl = np.vstack((reftrack[:, :2], reftrack[0, :2]))
+        coeffs_x, coeffs_y, a_interp, normvectors = tph.calc_splines.calc_splines(path=refpath_cl)
+        spline_lengths_refline = tph.calc_spline_lengths.calc_spline_lengths(coeffs_x=coeffs_x, coeffs_y=coeffs_y)
+        _, kappa_reftrack_tmp = tph.calc_head_curv_num.calc_head_curv_num(
+            path=reftrack[:, :2],
+            el_lengths=spline_lengths_refline,
+            is_closed=True,
+            stepsize_curv_preview=curv_calc_opts["d_preview_curv"],
+            stepsize_curv_review=curv_calc_opts["d_review_curv"],
+            stepsize_psi_preview=curv_calc_opts["d_preview_head"],
+            stepsize_psi_review=curv_calc_opts["d_review_head"])
+
+        safety_distances = kappa_to_width_transform(kappas=kappa_reftrack_tmp,
+                                                    racecar_width=w_veh,
+                                                    max_safety_dist=max_safety_dist,
+                                                    min_safety_dist=min_safety_dist,
+                                                    max_curvature=max_curvature,
+                                                    min_curvature=min_curvature)
+    else:
+        # Set constant safety distance
+        print(f"{curv_safety_width_params=} or {curv_calc_opts=} not provided. Using constant safety distance = {w_veh=:0.2f}.")
+        safety_distances = w_veh * np.ones(reftrack_tmp.shape[0])
 
     # loop
     iter_cur = 0
@@ -106,12 +139,9 @@ def iqp_handler(reftrack: np.ndarray,
     while True:
         iter_cur += 1
 
-        saftey_distances = kappa_to_width_transform(kappas=kappa_reftrack_tmp,
-                                                    racecar_width=w_veh,
-                                                    max_safety_dist=0.45,
-                                                    min_safety_dist=0.15,
-                                                    max_curvature=0.5,
-                                                    min_curvature=0.0)
+        # FIXME: The number of elements in the reftrack changes with iteration! So this check is not valid.
+        assert safety_distances.shape[0] == reftrack_tmp.shape[0], \
+            f"Safety distances must be same length as reftrack. {safety_distances.shape=} != {reftrack_tmp.shape=}"
 
         # calculate intermediate solution and catch sum of squared curvature errors
         alpha_mincurv_tmp, curv_error_max_tmp = tph.opt_min_curv.\
@@ -119,7 +149,7 @@ def iqp_handler(reftrack: np.ndarray,
                          normvectors=normvectors_tmp,
                          A=A_tmp,
                          kappa_bound=kappa_bound,
-                         w_veh=saftey_distances,
+                         w_veh=safety_distances,
                          print_debug=print_debug,
                          plot_debug=plot_debug)
 
